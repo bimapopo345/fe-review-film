@@ -13,7 +13,7 @@ export const useAuthStore = defineStore("auth", {
   getters: {
     isAuthenticated: (state) => !!state.token,
     isAdmin: (state) =>
-      state.user?.role?.name === "admin" || state.user?.role === "admin",
+      state.user?.role_id === "45dc2d35-eec4-4515-a540-f72438467097",
     isVerified: (state) => !!state.user?.email_verified_at,
   },
 
@@ -24,10 +24,13 @@ export const useAuthStore = defineStore("auth", {
         this.error = null;
         const response = await auth.login(credentials);
         const { token, user } = response.data;
+
         this.token = token;
         this.user = user;
+
         localStorage.setItem("token", token);
         localStorage.setItem("user", JSON.stringify(user));
+
         router.push("/");
       } catch (error) {
         this.error = error.response?.data?.message || "Login failed";
@@ -43,10 +46,13 @@ export const useAuthStore = defineStore("auth", {
         this.error = null;
         const response = await auth.register(userData);
         const { token, user } = response.data;
+
         this.token = token;
         this.user = user;
+
         localStorage.setItem("token", token);
         localStorage.setItem("user", JSON.stringify(user));
+
         router.push("/generate-otp");
       } catch (error) {
         this.error = error.response?.data?.message || "Registration failed";
@@ -91,9 +97,8 @@ export const useAuthStore = defineStore("auth", {
         this.loading = true;
         this.error = null;
         const response = await auth.verifyEmail({ otp });
-        // Endpoint hanya return message; boleh fetch user lagi
-        // misal panggil this.fetchUser()
-        // atau kalau endpoint return user, tangkap di response.data.user
+        this.user = response.data.user;
+        localStorage.setItem("user", JSON.stringify(response.data.user));
         router.push("/");
       } catch (error) {
         this.error =

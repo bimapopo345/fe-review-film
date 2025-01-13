@@ -57,12 +57,11 @@ const isAuthenticated = computed(() => {
 });
 
 // Cek apakah role user adalah admin
+const ADMIN_ROLE_ID = "45dc2d35-eec4-4515-a540-f72438467097"; // Ganti dengan role_id admin Anda
+
 const isAdmin = computed(() => {
   const user = JSON.parse(localStorage.getItem("user") || "{}");
-  // Pastikan menyesuaikan dengan struktur real user Anda:
-  // jika user.role = "admin" => return user.role === "admin"
-  // jika user.role.name => return user.role.name === "admin"
-  return user.role?.name === "admin";
+  return user.role_id === ADMIN_ROLE_ID;
 });
 
 const handleLogout = async () => {

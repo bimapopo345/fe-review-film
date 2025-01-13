@@ -31,7 +31,7 @@
             </td>
             <td>{{ movie.title }}</td>
             <td>{{ movie.year }}</td>
-            <td>{{ movie.genre?.name }}</td>
+            <td>{{ getGenreName(movie.genre_id) }}</td>
             <td>
               <button @click="editMovie(movie)" class="edit-btn">Edit</button>
               <button @click="confirmDelete(movie)" class="delete-btn">
@@ -61,6 +61,9 @@
               class="form-control"
               required
             />
+            <span v-if="formErrors.title" class="error-text">{{
+              formErrors.title
+            }}</span>
           </div>
 
           <div class="form-group">
@@ -71,6 +74,9 @@
               required
               rows="3"
             ></textarea>
+            <span v-if="formErrors.summary" class="error-text">{{
+              formErrors.summary
+            }}</span>
           </div>
 
           <div class="form-group">
@@ -81,7 +87,13 @@
               v-model="formData.year"
               class="form-control"
               required
+              maxlength="4"
+              pattern="^\d{4}$"
+              title="Please enter a 4-digit year."
             />
+            <span v-if="formErrors.year" class="error-text">{{
+              formErrors.year
+            }}</span>
           </div>
 
           <div class="form-group">
@@ -93,10 +105,13 @@
               required
             >
               <option value="">Select Genre</option>
-              <option v-for="g in genres" :key="g.id" :value="g.id">
+              <option v-for="g in genresList" :key="g.id" :value="g.id">
                 {{ g.name }}
               </option>
             </select>
+            <span v-if="formErrors.genre_id" class="error-text">{{
+              formErrors.genre_id
+            }}</span>
           </div>
 
           <div class="form-group">
@@ -106,7 +121,11 @@
               id="poster"
               @change="handleFileChange"
               accept="image/*"
+              :required="!showEditModal"
             />
+            <span v-if="formErrors.poster" class="error-text">{{
+              formErrors.poster
+            }}</span>
           </div>
 
           <div class="modal-actions">
@@ -149,7 +168,7 @@
 
 <script setup>
 import { ref, onMounted } from "vue";
-import { movies, genres, handleApiError } from "@/api";
+import axios from "axios";
 
 const movieList = ref([]);
 const genresList = ref([]);
@@ -171,30 +190,42 @@ const formData = ref({
   poster: null,
 });
 
-//--- Fetch
+const formErrors = ref({});
+
+//--- Fetch Movies
 async function fetchMovies() {
   try {
     loading.value = true;
-    const response = await movies.getAll(); // GET /movie
-    // response.data => { message, data: [ {...}, ... ] }
+    const token = localStorage.getItem("token"); // Sesuaikan dengan metode penyimpanan token Anda
+    const response = await axios.get("http://localhost:8000/api/v1/movie", {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
     movieList.value = response.data.data;
   } catch (err) {
-    error.value = handleApiError(err);
+    error.value = err.response?.data?.message || "Error fetching movies";
   } finally {
     loading.value = false;
   }
 }
 
+//--- Fetch Genres
 async function fetchGenres() {
   try {
-    const res = await genres.getAll(); // GET /genre
+    const token = localStorage.getItem("token");
+    const res = await axios.get("http://localhost:8000/api/v1/genre", {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
     genresList.value = res.data.data;
   } catch (err) {
     console.error(err);
   }
 }
 
-//--- Modal
+//--- Close Modal
 function closeModal() {
   showCreateModal.value = false;
   showEditModal.value = false;
@@ -207,9 +238,10 @@ function closeModal() {
     genre_id: "",
     poster: null,
   };
+  formErrors.value = {};
 }
 
-//--- CRUD
+//--- Handle File Change
 function handleFileChange(e) {
   const file = e.target.files[0];
   if (file) {
@@ -217,57 +249,119 @@ function handleFileChange(e) {
   }
 }
 
+//--- Handle Submit (Create & Update)
 async function handleSubmit() {
   try {
     submitting.value = true;
-    if (showEditModal.value && movieToDelete.value) {
-      // Update
-      await movies.update(movieToDelete.value.id, formData.value);
-    } else {
-      // Create
-      await movies.create(formData.value);
+    formErrors.value = {};
+
+    const payload = new FormData();
+    payload.append("title", formData.value.title);
+    payload.append("summary", formData.value.summary);
+    payload.append("year", formData.value.year);
+    payload.append("genre_id", formData.value.genre_id);
+    if (formData.value.poster) {
+      payload.append("poster", formData.value.poster);
     }
+
+    // Debug: Log FormData
+    for (let pair of payload.entries()) {
+      console.log(pair[0] + ": " + pair[1]);
+    }
+
+    let response;
+    const token = localStorage.getItem("token"); // Sesuaikan dengan metode penyimpanan token Anda
+
+    if (showEditModal.value && movieToDelete.value) {
+      // Update Movie
+      response = await axios.put(
+        `http://localhost:8000/api/v1/movie/${movieToDelete.value.id}`,
+        payload,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            // "Content-Type": "multipart/form-data", // Hapus ini
+          },
+        }
+      );
+    } else {
+      // Create Movie
+      response = await axios.post(
+        "http://localhost:8000/api/v1/movie",
+        payload,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            // "Content-Type": "multipart/form-data", // Hapus ini
+          },
+        }
+      );
+    }
+
     await fetchMovies();
     closeModal();
   } catch (err) {
-    handleApiError(err);
+    if (err.response && err.response.status === 422) {
+      formErrors.value = err.response.data.errors;
+      console.log("Validation errors:", err.response.data.errors);
+    } else {
+      error.value = err.response?.data?.message || "An error occurred";
+      console.error(err);
+    }
   } finally {
     submitting.value = false;
   }
 }
 
+//--- Edit Movie
 function editMovie(movie) {
-  movieToDelete.value = movie; //menyimpan data
+  movieToDelete.value = movie; // Menyimpan data
   formData.value = {
     title: movie.title,
     summary: movie.summary,
-    year: movie.year,
+    year: movie.year.toString(), // Pastikan tahun adalah string
     genre_id: movie.genre_id,
-    poster: null, // reset file
+    poster: null, // Reset file
   };
   showEditModal.value = true;
 }
 
+//--- Confirm Delete
 function confirmDelete(movie) {
   movieToDelete.value = movie;
   showDeleteModal.value = true;
 }
 
+//--- Delete Movie
 async function deleteMovie() {
   if (!movieToDelete.value) return;
   try {
     submitting.value = true;
-    await movies.delete(movieToDelete.value.id);
+    const token = localStorage.getItem("token");
+    await axios.delete(
+      `http://localhost:8000/api/v1/movie/${movieToDelete.value.id}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
     await fetchMovies();
     showDeleteModal.value = false;
   } catch (err) {
-    handleApiError(err);
+    error.value = err.response?.data?.message || "Error deleting movie";
   } finally {
     submitting.value = false;
   }
 }
 
-//--- Lifecycle
+//--- Helper: Get Genre Name
+function getGenreName(genreId) {
+  const genre = genresList.value.find((g) => g.id === genreId);
+  return genre ? genre.name : "N/A";
+}
+
+//--- Lifecycle Hook
 onMounted(async () => {
   await fetchMovies();
   await fetchGenres();
@@ -506,7 +600,8 @@ onMounted(async () => {
 }
 
 .loading,
-.error-message {
+.error-message,
+.no-results {
   text-align: center;
   padding: 2rem;
   background: #f8f9fa;
@@ -517,5 +612,10 @@ onMounted(async () => {
 .error-message {
   background: #f8d7da;
   color: #dc3545;
+}
+
+.error-text {
+  color: #dc3545;
+  font-size: 0.875rem;
 }
 </style>

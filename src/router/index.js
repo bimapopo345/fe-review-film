@@ -152,20 +152,23 @@ const router = createRouter({
 router.beforeEach((to, from, next) => {
   const isAuthenticated = !!localStorage.getItem("token");
   const user = JSON.parse(localStorage.getItem("user") || "{}");
-  const isAdmin = user.role?.name === "admin" || user.role === "admin";
+  const isAdmin = user.role_id === "45dc2d35-eec4-4515-a540-f72438467097";
 
-  // Routes that require guest
+  // Routes that require guest access
   if (to.meta.requiresGuest && isAuthenticated) {
     return next("/");
   }
-  // Routes that require auth
+
+  // Routes that require authentication
   if (to.meta.requiresAuth && !isAuthenticated) {
     return next("/login");
   }
-  // Admin
+
+  // Routes that require admin access
   if (to.meta.requiresAdmin && !isAdmin) {
     return next("/");
   }
+
   next();
 });
 
