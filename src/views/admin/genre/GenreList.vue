@@ -9,16 +9,16 @@
 
     <div v-if="loading" class="loading">Loading genres...</div>
     <div v-else-if="error" class="error-message">{{ error }}</div>
-    <div v-else class="table-container">
-      <table class="table">
+    <div v-else>
+      <table class="genre-table">
         <thead>
           <tr>
-            <th>Genre Name</th>
+            <th>Name</th>
             <th>Actions</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="genre in genresList" :key="genre.id">
+          <tr v-for="genre in genreList" :key="genre.id">
             <td>{{ genre.name }}</td>
             <td>
               <button @click="editGenre(genre)" class="edit-btn">Edit</button>
@@ -31,23 +31,23 @@
       </table>
     </div>
 
-    <!-- Create/Edit Modal -->
+    <!-- CREATE/EDIT MODAL -->
     <div
       v-if="showCreateModal || showEditModal"
       class="modal-overlay"
       @click="closeModal"
     >
       <div class="modal-content" @click.stop>
-        <h2>{{ showEditModal ? "Edit Genre" : "Add New Genre" }}</h2>
+        <h2>{{ showEditModal ? "Edit Genre" : "Create Genre" }}</h2>
         <form @submit.prevent="handleSubmit" class="genre-form">
           <div class="form-group">
-            <label>Genre Name</label>
+            <label for="name">Name</label>
             <input
               type="text"
+              id="name"
               v-model="formData.name"
-              required
               class="form-control"
-              :disabled="submitting"
+              required
             />
           </div>
 
@@ -65,7 +65,7 @@
       </div>
     </div>
 
-    <!-- Delete Modal -->
+    <!-- DELETE CONFIRMATION MODAL -->
     <div
       v-if="showDeleteModal"
       class="modal-overlay"
@@ -73,11 +73,11 @@
     >
       <div class="modal-content" @click.stop>
         <h2>Delete Genre</h2>
-        <p>Are you sure you want to delete "{{ genreToDelete?.name }}"?</p>
+        <p>Are you sure to delete "{{ genreToDelete?.name }}"?</p>
         <div class="modal-actions">
           <button
-            @click="deleteGenre"
             class="delete-btn"
+            @click="deleteGenre"
             :disabled="submitting"
           >
             {{ submitting ? "Deleting..." : "Delete" }}
@@ -95,7 +95,7 @@
 import { ref, onMounted } from "vue";
 import { genres, handleApiError } from "@/api";
 
-const genresList = ref([]);
+const genreList = ref([]);
 const loading = ref(false);
 const error = ref(null);
 
@@ -105,48 +105,43 @@ const showDeleteModal = ref(false);
 const submitting = ref(false);
 
 const genreToDelete = ref(null);
+
 const formData = ref({
   name: "",
 });
 
-const fetchGenres = async () => {
+//--- fetch
+async function fetchGenres() {
   try {
     loading.value = true;
-    const res = await genres.getAll();
-    genresList.value = res.data;
+    const response = await genres.getAll(); // GET /genre
+    genreList.value = response.data.data;
   } catch (err) {
     error.value = handleApiError(err);
   } finally {
     loading.value = false;
   }
-};
+}
 
-const editGenre = (genre) => {
-  showEditModal.value = true;
-  genreToDelete.value = genre;
-  formData.value = { name: genre.name };
-};
-
-const confirmDelete = (genre) => {
-  genreToDelete.value = genre;
-  showDeleteModal.value = true;
-};
-
-const closeModal = () => {
+//--- modal
+function closeModal() {
   showCreateModal.value = false;
   showEditModal.value = false;
   showDeleteModal.value = false;
   genreToDelete.value = null;
   formData.value = { name: "" };
-};
+}
 
-const handleSubmit = async () => {
+//--- CRUD
+async function handleSubmit() {
   try {
     submitting.value = true;
     if (showEditModal.value && genreToDelete.value) {
-      await genres.update(genreToDelete.value.id, formData.value);
+      await genres.update(genreToDelete.value.id, {
+        name: formData.value.name,
+      });
     } else {
-      await genres.create(formData.value);
+      await genres.create({ name: formData.value.name });
     }
     await fetchGenres();
     closeModal();
@@ -155,25 +150,37 @@ const handleSubmit = async () => {
   } finally {
     submitting.value = false;
   }
-};
+}
 
-const deleteGenre = async () => {
+function editGenre(genre) {
+  genreToDelete.value = genre;
+  formData.value = { name: genre.name };
+  showEditModal.value = true;
+}
+
+function confirmDelete(genre) {
+  genreToDelete.value = genre;
+  showDeleteModal.value = true;
+}
+
+async function deleteGenre() {
   if (!genreToDelete.value) return;
   try {
     submitting.value = true;
     await genres.delete(genreToDelete.value.id);
-    genresList.value = genresList.value.filter(
-      (g) => g.id !== genreToDelete.value.id
-    );
-    closeModal();
+    await fetchGenres();
+    showDeleteModal.value = false;
   } catch (err) {
     handleApiError(err);
   } finally {
     submitting.value = false;
   }
-};
+}
 
-onMounted(fetchGenres);
+//--- lifecycle
+onMounted(async () => {
+  await fetchGenres();
+});
 </script>
 
 <style scoped>

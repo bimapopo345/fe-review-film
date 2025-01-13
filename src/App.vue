@@ -24,6 +24,7 @@
             <div class="dropdown">
               <button class="dropdown-btn">Admin</button>
               <div class="dropdown-content">
+                <!-- Pastikan rute-rute admin ini sesuai dengan yang ada di router/index.js -->
                 <router-link to="/admin/movies">Movies</router-link>
                 <router-link to="/admin/casts">Casts</router-link>
                 <router-link to="/admin/genres">Genres</router-link>
@@ -50,22 +51,23 @@ import axios from "axios";
 
 const router = useRouter();
 
+// Cek apakah user sudah memiliki token (sudah login)
 const isAuthenticated = computed(() => {
   return !!localStorage.getItem("token");
 });
 
+// Cek apakah role user adalah admin
 const isAdmin = computed(() => {
   const user = JSON.parse(localStorage.getItem("user") || "{}");
+  // Pastikan menyesuaikan dengan struktur real user Anda:
+  // jika user.role = "admin" => return user.role === "admin"
+  // jika user.role.name => return user.role.name === "admin"
   return user.role?.name === "admin";
-  // Catatan:
-  // Tergantung response dari backend,
-  // Kalau user.role = "admin" => user.role
-  // Kalau user.role.name => user.role.name
 });
 
 const handleLogout = async () => {
   try {
-    await axios.post("/auth/logout");
+    await axios.post("/auth/logout"); // panggil endpoint logout
     localStorage.removeItem("token");
     localStorage.removeItem("user");
     router.push("/login");

@@ -7,37 +7,33 @@
       </button>
     </div>
 
-    <div v-if="loading" class="loading">Loading cast-movie relations...</div>
+    <div v-if="loading" class="loading">Loading cast-movie...</div>
     <div v-else-if="error" class="error-message">{{ error }}</div>
-    <div v-else class="table-container">
-      <table class="table">
+    <div v-else>
+      <table>
         <thead>
           <tr>
-            <th>Name (Role)</th>
+            <th>Name</th>
             <th>Cast</th>
             <th>Movie</th>
             <th>Actions</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="item in castMoviesList" :key="item.id">
-            <td>{{ item.name }}</td>
-            <td>{{ item.cast?.name }}</td>
-            <td>{{ item.movie?.title }}</td>
+          <tr v-for="cm in castMovieList" :key="cm.id">
+            <td>{{ cm.name }}</td>
+            <td>{{ cm.cast_id }}</td>
+            <td>{{ cm.movie_id }}</td>
             <td>
-              <button @click="editCastMovie(item)" class="edit-btn">
-                Edit
-              </button>
-              <button @click="confirmDelete(item)" class="delete-btn">
-                Delete
-              </button>
+              <button @click="editCastMovie(cm)">Edit</button>
+              <button @click="confirmDelete(cm)">Delete</button>
             </td>
           </tr>
         </tbody>
       </table>
     </div>
 
-    <!-- Create/Edit Modal -->
+    <!-- CREATE/EDIT MODAL -->
     <div
       v-if="showCreateModal || showEditModal"
       class="modal-overlay"
@@ -45,21 +41,16 @@
     >
       <div class="modal-content" @click.stop>
         <h2>
-          {{ showEditModal ? "Edit Cast-Movie" : "Add New Cast-Movie" }}
+          {{ showEditModal ? "Edit Cast-Movie" : "Create Cast-Movie" }}
         </h2>
         <form @submit.prevent="handleSubmit">
           <div class="form-group">
-            <label>Relation Name (Role)</label>
-            <input
-              type="text"
-              v-model="formData.name"
-              required
-              class="form-control"
-            />
+            <label>Name</label>
+            <input v-model="formData.name" type="text" required />
           </div>
           <div class="form-group">
             <label>Cast</label>
-            <select v-model="formData.cast_id" required class="form-control">
+            <select v-model="formData.cast_id" required>
               <option value="">Select Cast</option>
               <option v-for="c in castsList" :key="c.id" :value="c.id">
                 {{ c.name }}
@@ -68,7 +59,7 @@
           </div>
           <div class="form-group">
             <label>Movie</label>
-            <select v-model="formData.movie_id" required class="form-control">
+            <select v-model="formData.movie_id" required>
               <option value="">Select Movie</option>
               <option v-for="m in moviesList" :key="m.id" :value="m.id">
                 {{ m.title }}
@@ -77,43 +68,29 @@
           </div>
 
           <div class="modal-actions">
-            <button type="submit" class="submit-btn" :disabled="submitting">
-              {{
-                submitting ? "Saving..." : showEditModal ? "Update" : "Create"
-              }}
+            <button type="submit" :disabled="submitting">
+              {{ submitting ? "Saving..." : "Save" }}
             </button>
-            <button type="button" class="cancel-btn" @click="closeModal">
-              Cancel
-            </button>
+            <button type="button" @click="closeModal">Cancel</button>
           </div>
         </form>
       </div>
     </div>
 
-    <!-- Delete Confirmation Modal -->
+    <!-- DELETE MODAL -->
     <div
       v-if="showDeleteModal"
       class="modal-overlay"
       @click="showDeleteModal = false"
     >
       <div class="modal-content" @click.stop>
-        <h2>Delete Cast-Movie Relation</h2>
-        <p>
-          Are you sure you want to delete relation "{{
-            castMovieToDelete?.name
-          }}"?
-        </p>
+        <h2>Delete Cast-Movie</h2>
+        <p>Are you sure to delete "{{ castMovieToDelete?.name }}"?</p>
         <div class="modal-actions">
-          <button
-            @click="deleteCastMovie"
-            class="delete-btn"
-            :disabled="submitting"
-          >
+          <button @click="deleteCastMovie" :disabled="submitting">
             {{ submitting ? "Deleting..." : "Delete" }}
           </button>
-          <button @click="showDeleteModal = false" class="cancel-btn">
-            Cancel
-          </button>
+          <button @click="showDeleteModal = false">Cancel</button>
         </div>
       </div>
     </div>
@@ -124,99 +101,108 @@
 import { ref, onMounted } from "vue";
 import { castMovies, casts, movies, handleApiError } from "@/api";
 
-const castMoviesList = ref([]);
+const castMovieList = ref([]);
 const castsList = ref([]);
 const moviesList = ref([]);
-
 const loading = ref(false);
 const error = ref(null);
+
 const showCreateModal = ref(false);
 const showEditModal = ref(false);
 const showDeleteModal = ref(false);
 const submitting = ref(false);
 
 const castMovieToDelete = ref(null);
+
 const formData = ref({
   name: "",
   cast_id: "",
   movie_id: "",
 });
 
-const fetchAllData = async () => {
+async function fetchAll() {
   try {
     loading.value = true;
     const [cmRes, cRes, mRes] = await Promise.all([
-      castMovies.getAll(),
-      casts.getAll(),
-      movies.getAll(),
+      castMovies.getAll(), // GET /cast-movie
+      casts.getAll(), // GET /cast
+      movies.getAll(), // GET /movie
     ]);
-    castMoviesList.value = cmRes.data;
-    castsList.value = cRes.data;
-    moviesList.value = mRes.data;
+    castMovieList.value = cmRes.data.data;
+    castsList.value = cRes.data.data;
+    moviesList.value = mRes.data.data;
   } catch (err) {
     error.value = handleApiError(err);
   } finally {
     loading.value = false;
   }
-};
+}
 
-const editCastMovie = (item) => {
-  showEditModal.value = true;
-  castMovieToDelete.value = item;
-  formData.value = {
-    name: item.name,
-    cast_id: item.cast_id,
-    movie_id: item.movie_id,
-  };
-};
-
-const confirmDelete = (item) => {
-  castMovieToDelete.value = item;
-  showDeleteModal.value = true;
-};
-
-const closeModal = () => {
+function closeModal() {
   showCreateModal.value = false;
   showEditModal.value = false;
   showDeleteModal.value = false;
   castMovieToDelete.value = null;
   formData.value = { name: "", cast_id: "", movie_id: "" };
-};
+}
 
-const handleSubmit = async () => {
+async function handleSubmit() {
   try {
     submitting.value = true;
     if (showEditModal.value && castMovieToDelete.value) {
-      await castMovies.update(castMovieToDelete.value.id, formData.value);
+      await castMovies.update(castMovieToDelete.value.id, {
+        name: formData.value.name,
+        cast_id: formData.value.cast_id,
+        movie_id: formData.value.movie_id,
+      });
     } else {
-      await castMovies.create(formData.value);
+      await castMovies.create({
+        name: formData.value.name,
+        cast_id: formData.value.cast_id,
+        movie_id: formData.value.movie_id,
+      });
     }
-    await fetchAllData();
+    await fetchAll();
     closeModal();
   } catch (err) {
     handleApiError(err);
   } finally {
     submitting.value = false;
   }
-};
+}
 
-const deleteCastMovie = async () => {
+function editCastMovie(cm) {
+  castMovieToDelete.value = cm;
+  formData.value = {
+    name: cm.name,
+    cast_id: cm.cast_id,
+    movie_id: cm.movie_id,
+  };
+  showEditModal.value = true;
+}
+
+function confirmDelete(cm) {
+  castMovieToDelete.value = cm;
+  showDeleteModal.value = true;
+}
+
+async function deleteCastMovie() {
   if (!castMovieToDelete.value) return;
   try {
     submitting.value = true;
     await castMovies.delete(castMovieToDelete.value.id);
-    castMoviesList.value = castMoviesList.value.filter(
-      (cm) => cm.id !== castMovieToDelete.value.id
-    );
-    closeModal();
+    await fetchAll();
+    showDeleteModal.value = false;
   } catch (err) {
     handleApiError(err);
   } finally {
     submitting.value = false;
   }
-};
+}
 
-onMounted(fetchAllData);
+onMounted(async () => {
+  await fetchAll();
+});
 </script>
 
 <style scoped>

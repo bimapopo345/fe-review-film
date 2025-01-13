@@ -1,17 +1,15 @@
 <template>
   <div class="admin-movie-list">
     <div class="page-header">
-      <h1>Manage Movies (Admin)</h1>
+      <h1>Manage Movies</h1>
       <button @click="showCreateModal = true" class="create-btn">
         Add New Movie
       </button>
     </div>
 
     <div v-if="loading" class="loading">Loading movies...</div>
-
     <div v-else-if="error" class="error-message">{{ error }}</div>
-
-    <div v-else>
+    <div v-else class="movie-table-container">
       <table class="movie-table">
         <thead>
           <tr>
@@ -27,8 +25,8 @@
             <td>
               <img
                 :src="movie.poster || '/placeholder-movie.jpg'"
-                alt="poster"
-                class="poster-thumbnail"
+                :alt="movie.title"
+                class="movie-thumbnail"
               />
             </td>
             <td>{{ movie.title }}</td>
@@ -55,34 +53,60 @@
         <h2>{{ showEditModal ? "Edit Movie" : "Create Movie" }}</h2>
         <form @submit.prevent="handleSubmit" class="movie-form">
           <div class="form-group">
-            <label>Title</label>
+            <label for="title">Title</label>
             <input
               type="text"
+              id="title"
               v-model="formData.title"
               class="form-control"
               required
             />
           </div>
+
           <div class="form-group">
-            <label>Summary</label>
-            <textarea v-model="formData.summary" rows="3"></textarea>
+            <label for="summary">Summary</label>
+            <textarea
+              id="summary"
+              v-model="formData.summary"
+              required
+              rows="3"
+            ></textarea>
           </div>
+
           <div class="form-group">
-            <label>Year</label>
-            <input type="text" v-model="formData.year" required />
+            <label for="year">Year</label>
+            <input
+              type="text"
+              id="year"
+              v-model="formData.year"
+              class="form-control"
+              required
+            />
           </div>
+
           <div class="form-group">
-            <label>Genre</label>
-            <select v-model="formData.genre_id" required>
+            <label for="genre">Genre</label>
+            <select
+              id="genre"
+              v-model="formData.genre_id"
+              class="form-control"
+              required
+            >
               <option value="">Select Genre</option>
               <option v-for="g in genres" :key="g.id" :value="g.id">
                 {{ g.name }}
               </option>
             </select>
           </div>
+
           <div class="form-group">
-            <label>Poster</label>
-            <input type="file" @change="handleFileChange" accept="image/*" />
+            <label for="poster">Poster</label>
+            <input
+              type="file"
+              id="poster"
+              @change="handleFileChange"
+              accept="image/*"
+            />
           </div>
 
           <div class="modal-actions">
@@ -139,7 +163,6 @@ const submitting = ref(false);
 
 const movieToDelete = ref(null);
 
-// form data
 const formData = ref({
   title: "",
   summary: "",
@@ -148,87 +171,31 @@ const formData = ref({
   poster: null,
 });
 
-const fetchMovies = async () => {
+//--- Fetch
+async function fetchMovies() {
   try {
     loading.value = true;
-    const res = await movies.getAll();
-    // => res.data = { message: "...", data: [ ... ] }
-    movieList.value = res.data.data;
+    const response = await movies.getAll(); // GET /movie
+    // response.data => { message, data: [ {...}, ... ] }
+    movieList.value = response.data.data;
   } catch (err) {
     error.value = handleApiError(err);
   } finally {
     loading.value = false;
   }
-};
+}
 
-const fetchGenres = async () => {
+async function fetchGenres() {
   try {
-    const res = await genres.getAll();
+    const res = await genres.getAll(); // GET /genre
     genresList.value = res.data.data;
   } catch (err) {
     console.error(err);
   }
-};
+}
 
-const handleFileChange = (e) => {
-  const file = e.target.files[0];
-  if (file) {
-    formData.value.poster = file;
-  }
-};
-
-const handleSubmit = async () => {
-  try {
-    submitting.value = true;
-    if (showEditModal.value) {
-      // Update
-      await movies.update(movieToDelete.value.id, formData.value);
-    } else {
-      // Create
-      await movies.create(formData.value);
-    }
-    // Refresh
-    await fetchMovies();
-    closeModal();
-  } catch (err) {
-    handleApiError(err);
-  } finally {
-    submitting.value = false;
-  }
-};
-
-const editMovie = (movie) => {
-  movieToDelete.value = movie;
-  formData.value = {
-    title: movie.title,
-    summary: movie.summary,
-    year: movie.year,
-    genre_id: movie.genre_id,
-    poster: null,
-  };
-  showEditModal.value = true;
-};
-
-const confirmDelete = (movie) => {
-  movieToDelete.value = movie;
-  showDeleteModal.value = true;
-};
-
-const deleteMovie = async () => {
-  if (!movieToDelete.value) return;
-  try {
-    submitting.value = true;
-    await movies.delete(movieToDelete.value.id);
-    await fetchMovies();
-    showDeleteModal.value = false;
-  } catch (err) {
-    handleApiError(err);
-  } finally {
-    submitting.value = false;
-  }
-};
-
-const closeModal = () => {
+//--- Modal
+function closeModal() {
   showCreateModal.value = false;
   showEditModal.value = false;
   showDeleteModal.value = false;
@@ -240,8 +207,67 @@ const closeModal = () => {
     genre_id: "",
     poster: null,
   };
-};
+}
 
+//--- CRUD
+function handleFileChange(e) {
+  const file = e.target.files[0];
+  if (file) {
+    formData.value.poster = file;
+  }
+}
+
+async function handleSubmit() {
+  try {
+    submitting.value = true;
+    if (showEditModal.value && movieToDelete.value) {
+      // Update
+      await movies.update(movieToDelete.value.id, formData.value);
+    } else {
+      // Create
+      await movies.create(formData.value);
+    }
+    await fetchMovies();
+    closeModal();
+  } catch (err) {
+    handleApiError(err);
+  } finally {
+    submitting.value = false;
+  }
+}
+
+function editMovie(movie) {
+  movieToDelete.value = movie; //menyimpan data
+  formData.value = {
+    title: movie.title,
+    summary: movie.summary,
+    year: movie.year,
+    genre_id: movie.genre_id,
+    poster: null, // reset file
+  };
+  showEditModal.value = true;
+}
+
+function confirmDelete(movie) {
+  movieToDelete.value = movie;
+  showDeleteModal.value = true;
+}
+
+async function deleteMovie() {
+  if (!movieToDelete.value) return;
+  try {
+    submitting.value = true;
+    await movies.delete(movieToDelete.value.id);
+    await fetchMovies();
+    showDeleteModal.value = false;
+  } catch (err) {
+    handleApiError(err);
+  } finally {
+    submitting.value = false;
+  }
+}
+
+//--- Lifecycle
 onMounted(async () => {
   await fetchMovies();
   await fetchGenres();

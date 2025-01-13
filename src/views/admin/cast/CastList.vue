@@ -1,102 +1,86 @@
 <template>
   <div class="cast-list">
     <div class="page-header">
-      <h1>Manage Cast Members</h1>
+      <h1>Manage Casts</h1>
       <button @click="showCreateModal = true" class="create-btn">
         Add New Cast
       </button>
     </div>
 
-    <div v-if="loading" class="loading">Loading cast members...</div>
+    <div v-if="loading" class="loading">Loading casts...</div>
     <div v-else-if="error" class="error-message">{{ error }}</div>
-    <div v-else class="cast-grid">
-      <div v-for="castItem in castList" :key="castItem.id" class="cast-card">
-        <div class="cast-info">
-          <h3>{{ castItem.name }}</h3>
-          <p>Age: {{ castItem.age }}</p>
-          <p class="cast-bio">{{ truncateText(castItem.bio, 80) }}</p>
-          <div class="action-buttons">
-            <button @click="editCast(castItem)" class="edit-btn">Edit</button>
-            <button @click="confirmDelete(castItem)" class="delete-btn">
-              Delete
-            </button>
-          </div>
-        </div>
-      </div>
+    <div v-else>
+      <table class="cast-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Age</th>
+            <th>Bio</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="cast in castList" :key="cast.id">
+            <td>{{ cast.name }}</td>
+            <td>{{ cast.age }}</td>
+            <td>{{ cast.bio }}</td>
+            <td>
+              <button @click="editCast(cast)" class="edit-btn">Edit</button>
+              <button @click="confirmDelete(cast)" class="delete-btn">
+                Delete
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </div>
 
-    <!-- Create/Edit Modal -->
+    <!-- CREATE / EDIT MODAL -->
     <div
       v-if="showCreateModal || showEditModal"
       class="modal-overlay"
       @click="closeModal"
     >
       <div class="modal-content" @click.stop>
-        <h2>
-          {{ showEditModal ? "Edit Cast Member" : "Add New Cast Member" }}
-        </h2>
+        <h2>{{ showEditModal ? "Edit Cast" : "Create Cast" }}</h2>
         <form @submit.prevent="handleSubmit" class="cast-form">
           <div class="form-group">
             <label>Name</label>
-            <input
-              type="text"
-              v-model="formData.name"
-              required
-              class="form-control"
-              :disabled="submitting"
-            />
-          </div>
-          <div class="form-group">
-            <label>Bio</label>
-            <textarea
-              rows="4"
-              v-model="formData.bio"
-              required
-              class="form-control"
-              :disabled="submitting"
-            ></textarea>
+            <input v-model="formData.name" type="text" required />
           </div>
           <div class="form-group">
             <label>Age</label>
-            <input
-              type="number"
-              v-model="formData.age"
-              required
-              class="form-control"
-              :disabled="submitting"
-            />
+            <input v-model="formData.age" type="number" required />
+          </div>
+          <div class="form-group">
+            <label>Bio</label>
+            <textarea v-model="formData.bio" rows="3" required></textarea>
           </div>
 
           <div class="modal-actions">
-            <button type="submit" class="submit-btn" :disabled="submitting">
-              {{
-                submitting ? "Saving..." : showEditModal ? "Update" : "Create"
-              }}
+            <button type="submit" :disabled="submitting">
+              {{ submitting ? "Saving..." : "Save" }}
             </button>
-            <button type="button" class="cancel-btn" @click="closeModal">
-              Cancel
-            </button>
+            <button type="button" @click="closeModal">Cancel</button>
           </div>
         </form>
       </div>
     </div>
 
-    <!-- Delete Confirmation Modal -->
+    <!-- DELETE CONFIRMATION MODAL -->
     <div
       v-if="showDeleteModal"
       class="modal-overlay"
       @click="showDeleteModal = false"
     >
       <div class="modal-content" @click.stop>
-        <h2>Delete Cast Member</h2>
-        <p>Are you sure you want to delete "{{ castToDelete?.name }}"?</p>
+        <h2>Delete Cast</h2>
+        <p>Are you sure to delete "{{ castToDelete?.name }}"?</p>
         <div class="modal-actions">
-          <button @click="deleteCast" class="delete-btn" :disabled="submitting">
+          <button @click="deleteCast" :disabled="submitting">
             {{ submitting ? "Deleting..." : "Delete" }}
           </button>
-          <button @click="showDeleteModal = false" class="cancel-btn">
-            Cancel
-          </button>
+          <button @click="showDeleteModal = false">Cancel</button>
         </div>
       </div>
     </div>
@@ -117,62 +101,50 @@ const showDeleteModal = ref(false);
 const submitting = ref(false);
 
 const castToDelete = ref(null);
+
 const formData = ref({
   name: "",
+  age: null,
   bio: "",
-  age: 0,
 });
 
-const truncateText = (text, length) => {
-  if (!text) return "";
-  if (text.length <= length) return text;
-  return text.substring(0, length) + "...";
-};
-
-const fetchCasts = async () => {
+async function fetchCasts() {
   try {
     loading.value = true;
-    const res = await casts.getAll();
-    castList.value = res.data;
+    const res = await casts.getAll(); // GET /cast
+    castList.value = res.data.data;
   } catch (err) {
     error.value = handleApiError(err);
   } finally {
     loading.value = false;
   }
-};
+}
 
-const editCast = (castItem) => {
-  showEditModal.value = true;
-  castToDelete.value = castItem;
-  formData.value = {
-    name: castItem.name,
-    bio: castItem.bio,
-    age: castItem.age,
-  };
-};
-
-const confirmDelete = (castItem) => {
-  castToDelete.value = castItem;
-  showDeleteModal.value = true;
-};
-
-const closeModal = () => {
+function closeModal() {
   showCreateModal.value = false;
   showEditModal.value = false;
   showDeleteModal.value = false;
   castToDelete.value = null;
-  formData.value = { name: "", bio: "", age: 0 };
-};
+  formData.value = { name: "", age: null, bio: "" };
+}
 
-const handleSubmit = async () => {
+async function handleSubmit() {
   try {
     submitting.value = true;
-    if (showEditModal.value) {
+    if (showEditModal.value && castToDelete.value) {
       // update
-      await casts.update(castToDelete.value.id, formData.value);
+      await casts.update(castToDelete.value.id, {
+        name: formData.value.name,
+        bio: formData.value.bio,
+        age: formData.value.age,
+      });
     } else {
       // create
-      await casts.create(formData.value);
+      await casts.create({
+        name: formData.value.name,
+        bio: formData.value.bio,
+        age: formData.value.age,
+      });
     }
     await fetchCasts();
     closeModal();
@@ -181,25 +153,40 @@ const handleSubmit = async () => {
   } finally {
     submitting.value = false;
   }
-};
+}
 
-const deleteCast = async () => {
+function editCast(cast) {
+  castToDelete.value = cast;
+  formData.value = {
+    name: cast.name,
+    age: cast.age,
+    bio: cast.bio,
+  };
+  showEditModal.value = true;
+}
+
+function confirmDelete(cast) {
+  castToDelete.value = cast;
+  showDeleteModal.value = true;
+}
+
+async function deleteCast() {
   if (!castToDelete.value) return;
   try {
     submitting.value = true;
     await casts.delete(castToDelete.value.id);
-    castList.value = castList.value.filter(
-      (c) => c.id !== castToDelete.value.id
-    );
-    closeModal();
+    await fetchCasts();
+    showDeleteModal.value = false;
   } catch (err) {
     handleApiError(err);
   } finally {
     submitting.value = false;
   }
-};
+}
 
-onMounted(fetchCasts);
+onMounted(async () => {
+  await fetchCasts();
+});
 </script>
 
 <style scoped>
